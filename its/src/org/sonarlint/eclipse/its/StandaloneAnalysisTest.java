@@ -36,6 +36,7 @@ import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.reddeer.common.wait.TimePeriod;
+import org.eclipse.reddeer.common.wait.WaitUntil;
 import org.eclipse.reddeer.common.wait.WaitWhile;
 import org.eclipse.reddeer.eclipse.core.resources.DefaultProject;
 import org.eclipse.reddeer.eclipse.core.resources.Resource;
@@ -50,6 +51,7 @@ import org.eclipse.reddeer.jface.condition.WindowIsAvailable;
 import org.eclipse.reddeer.swt.api.Button;
 import org.eclipse.reddeer.swt.api.MenuItem;
 import org.eclipse.reddeer.swt.api.TreeItem;
+import org.eclipse.reddeer.swt.condition.ShellIsAvailable;
 import org.eclipse.reddeer.swt.impl.button.FinishButton;
 import org.eclipse.reddeer.swt.impl.button.PushButton;
 import org.eclipse.reddeer.swt.impl.menu.ContextMenu;
@@ -268,6 +270,7 @@ public class StandaloneAnalysisTest extends AbstractSonarLintTest {
     rootProject.getTreeItem().select();
     rootProject.getResource("src", "root", "nested", "example.py").open();
 
+    new WaitUntil(new ShellIsAvailable("Default Eclipse preferences for PyDev"));
     new PushButton(new DefaultShell("Default Eclipse preferences for PyDev"), "OK").click();
     waitForSonarLintJob();
 
