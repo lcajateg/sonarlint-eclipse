@@ -61,6 +61,7 @@ import org.eclipse.reddeer.workbench.impl.editor.DefaultEditor;
 import org.eclipse.reddeer.workbench.impl.editor.Marker;
 import org.eclipse.reddeer.workbench.impl.editor.TextEditor;
 import org.eclipse.reddeer.workbench.ui.dialogs.WorkbenchPreferenceDialog;
+import org.hamcrest.core.StringContains;
 import org.junit.Assume;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -91,7 +92,7 @@ public class StandaloneAnalysisTest extends AbstractSonarLintTest {
 
     new JavaPerspective().open();
     importExistingProjectIntoWorkspace("java/java-simple");
-    
+
     OnTheFlyView onTheFlyView = new OnTheFlyView();
     onTheFlyView.open();
 
@@ -99,8 +100,7 @@ public class StandaloneAnalysisTest extends AbstractSonarLintTest {
     packageExplorer.open();
     DefaultProject rootProject = packageExplorer.getProject("java-simple");
     Resource helloJavaFile = rootProject.getResource("src", "hello", "Hello.java");
-    helloJavaFile.open();
-    waitForSonarLintJob();
+    doAndWaitForSonarLintAnalysisJob(() -> helloJavaFile.open());
 
     DefaultEditor defaultEditor = new DefaultEditor();
     assertThat(defaultEditor.getMarkers())
@@ -116,26 +116,27 @@ public class StandaloneAnalysisTest extends AbstractSonarLintTest {
     PropertyDialog dialog = new PropertyDialog(rootProject.getName());
     dialog.open();
 
+    int analysisJobCountBefore = scheduledAnalysisJobCount.get();
+
     SonarLintProperties sonarLintProperties = new SonarLintProperties(dialog);
     dialog.select(sonarLintProperties);
     sonarLintProperties.disableAutomaticAnalysis();
     dialog.ok();
 
     helloJavaFile.open();
-    waitForSonarLintJob();
 
     TextEditor textEditor = new TextEditor();
     assertThat(textEditor.getMarkers()).isEmpty();
 
     textEditor.insertText(8, 29, "2");
     textEditor.save();
-    waitForSonarLintJob();
 
     assertThat(textEditor.getMarkers()).isEmpty();
 
+    assertThat(scheduledAnalysisJobCount.get()).isEqualTo(analysisJobCountBefore);
+
     // Trigger manual analysis of a single file
-    new ContextMenu(helloJavaFile.getTreeItem()).getItem("SonarLint", "Analyze").select();
-    waitForSonarLintJob();
+    doAndWaitForSonarLintAnalysisJob(() -> new ContextMenu(helloJavaFile.getTreeItem()).getItem("SonarLint", "Analyze").select());
 
     assertThat(textEditor.getMarkers())
       .extracting(Marker::getText, Marker::getLineNumber)
@@ -145,8 +146,7 @@ public class StandaloneAnalysisTest extends AbstractSonarLintTest {
     rootProject.getTreeItem().select();
     MenuItem menuItem = new ContextMenu(rootProject.getTreeItem()).getItem("SonarLint", "Analyze");
     menuItem.select();
-    new PushButton(new DefaultShell("Confirmation"), "OK").click();
-    waitForSonarLintJob();
+    doAndWaitForSonarLintAnalysisJob(() -> new PushButton(new DefaultShell("Confirmation"), "OK").click());
 
     ReportView reportView = new ReportView();
     reportView.open();
@@ -175,8 +175,7 @@ public class StandaloneAnalysisTest extends AbstractSonarLintTest {
 
     PackageExplorerPart packageExplorer = new PackageExplorerPart();
     DefaultProject rootProject = packageExplorer.getProject("java-junit");
-    rootProject.getResource("src", "hello", "Hello.java").open();
-    waitForSonarLintJob();
+    doAndWaitForSonarLintAnalysisJob(() -> rootProject.getResource("src", "hello", "Hello.java").open());
 
     DefaultEditor defaultEditor = new DefaultEditor();
     assertThat(defaultEditor.getMarkers())
@@ -185,8 +184,7 @@ public class StandaloneAnalysisTest extends AbstractSonarLintTest {
         tuple("Replace this use of System.out or System.err by a logger.", 12),
         tuple("Remove this unnecessary cast to \"int\".", 16)); // Test that sonar.java.libraries is set
 
-    rootProject.getResource("src", "hello", "HelloTestUtil.java").open();
-    waitForSonarLintJob();
+    doAndWaitForSonarLintAnalysisJob(() -> rootProject.getResource("src", "hello", "HelloTestUtil.java").open());
 
     defaultEditor = new DefaultEditor();
     assertThat(defaultEditor.getMarkers())
@@ -195,8 +193,7 @@ public class StandaloneAnalysisTest extends AbstractSonarLintTest {
         // File is flagged as test by regexp, only test rules are applied
         tuple("Remove this use of \"Thread.sleep()\".", 11));
 
-    rootProject.getResource("tests", "hello", "HelloTest.java").open();
-    waitForSonarLintJob();
+    doAndWaitForSonarLintAnalysisJob(() -> rootProject.getResource("tests", "hello", "HelloTest.java").open());
 
     defaultEditor = new DefaultEditor();
     assertThat(defaultEditor.getMarkers())
@@ -216,8 +213,7 @@ public class StandaloneAnalysisTest extends AbstractSonarLintTest {
 
     PackageExplorerPart packageExplorer = new PackageExplorerPart();
     DefaultProject rootProject = packageExplorer.getProject("java8");
-    rootProject.getResource("src", "hello", "Hello.java").open();
-    waitForSonarLintJob();
+    doAndWaitForSonarLintAnalysisJob(() -> rootProject.getResource("src", "hello", "Hello.java").open());
 
     DefaultEditor defaultEditor = new DefaultEditor();
     assertThat(defaultEditor.getMarkers())
@@ -243,8 +239,7 @@ public class StandaloneAnalysisTest extends AbstractSonarLintTest {
     File toBeDeleted = new File(ResourcesPlugin.getWorkspace().getRoot().getProject("java-main-project").getLocation().toFile(), "libs/toBeDeleted.jar");
     assertThat(toBeDeleted.delete()).as("Unable to delete JAR to test SONARIDE-350").isTrue();
 
-    rootProject.getResource("src", "use", "UseUtils.java").open();
-    waitForSonarLintJob();
+    doAndWaitForSonarLintAnalysisJob(() -> rootProject.getResource("src", "use", "UseUtils.java").open());
 
     DefaultEditor defaultEditor = new DefaultEditor();
     assertThat(defaultEditor.getMarkers())
@@ -268,11 +263,12 @@ public class StandaloneAnalysisTest extends AbstractSonarLintTest {
 
     DefaultProject rootProject = new PydevPackageExplorer().getProject("python");
     rootProject.getTreeItem().select();
-    rootProject.getResource("src", "root", "nested", "example.py").open();
+    doAndWaitForSonarLintAnalysisJob(() -> {
+      rootProject.getResource("src", "root", "nested", "example.py").open();
 
-    new WaitUntil(new ShellIsAvailable("Default Eclipse preferences for PyDev"));
-    new PushButton(new DefaultShell("Default Eclipse preferences for PyDev"), "OK").click();
-    waitForSonarLintJob();
+      new WaitUntil(new ShellIsAvailable("Default Eclipse preferences for PyDev"));
+      new PushButton(new DefaultShell("Default Eclipse preferences for PyDev"), "OK").click();
+    });
 
     assertThat(onTheFlyView.getIssues())
       .extracting(SonarLintIssue::getDescription, SonarLintIssue::getResource)
@@ -310,10 +306,10 @@ public class StandaloneAnalysisTest extends AbstractSonarLintTest {
 
     new PhpPerspective().open();
     importExistingProjectIntoWorkspace("php");
+    new WaitWhile(new JobIsRunning(StringContains.containsString("DLTK Indexing")), TimePeriod.LONG);
 
     DefaultProject rootProject = new ProjectExplorer().getProject("php");
-    rootProject.getResource("foo.php").open();
-    waitForSonarLintJob();
+    doAndWaitForSonarLintAnalysisJob(() -> rootProject.getResource("foo.php").open());
 
     OnTheFlyView onTheFlyView = new OnTheFlyView();
     onTheFlyView.open();
@@ -322,8 +318,7 @@ public class StandaloneAnalysisTest extends AbstractSonarLintTest {
       .containsOnly(tuple("This branch duplicates the one on line 5. [+1 location]", "foo.php"));
 
     // SLE-342
-    rootProject.getResource("foo.inc").open();
-    waitForSonarLintJob();
+    doAndWaitForSonarLintAnalysisJob(() -> rootProject.getResource("foo.inc").open());
 
     assertThat(onTheFlyView.getIssues())
       .extracting(SonarLintIssue::getDescription, SonarLintIssue::getResource)
@@ -345,8 +340,7 @@ public class StandaloneAnalysisTest extends AbstractSonarLintTest {
 
     rootProject.refresh();
 
-    rootProject.getResource("src", "hello", "HelloLinked.java").open();
-    waitForSonarLintJob();
+    doAndWaitForSonarLintAnalysisJob(() -> rootProject.getResource("src", "hello", "HelloLinked.java").open());
 
     DefaultEditor defaultEditor = new DefaultEditor("HelloLinked.java");
     assertThat(defaultEditor.getMarkers())
@@ -385,8 +379,7 @@ public class StandaloneAnalysisTest extends AbstractSonarLintTest {
 
     PackageExplorerPart packageExplorer = new PackageExplorerPart();
     DefaultProject rootProject = packageExplorer.getProject("Local_java-simple");
-    rootProject.getResource("src", "hello", "Hello.java").open();
-    waitForSonarLintJob();
+    doAndWaitForSonarLintAnalysisJob(() -> rootProject.getResource("src", "hello", "Hello.java").open());
 
     DefaultEditor defaultEditor = new DefaultEditor();
     assertThat(defaultEditor.getMarkers())
