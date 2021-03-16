@@ -67,6 +67,7 @@ import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.rules.TemporaryFolder;
+import org.sonarlint.eclipse.its.reddeer.conditions.OnTheFlyViewIsEmpty;
 import org.sonarlint.eclipse.its.reddeer.perspectives.PhpPerspective;
 import org.sonarlint.eclipse.its.reddeer.perspectives.PydevPerspective;
 import org.sonarlint.eclipse.its.reddeer.preferences.SonarLintPreferences;
@@ -108,6 +109,7 @@ public class StandaloneAnalysisTest extends AbstractSonarLintTest {
     // clear marker (probably a better way to do that)
     new ContextMenu(onTheFlyView.getItems().get(0)).getItem("Delete").select();
     new PushButton(new DefaultShell("Delete Selected Entries"), "Delete").click();
+    new WaitUntil(new OnTheFlyViewIsEmpty(onTheFlyView));
 
     rootProject.select();
     PropertyDialog dialog = new PropertyDialog(rootProject.getName());
